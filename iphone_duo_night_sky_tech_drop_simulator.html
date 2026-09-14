@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Apple Special Drop — iPhone Duo Edition</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        night: {
+                            950: '#02040a',
+                            900: '#070b16',
+                            850: '#0b1124',
+                            800: '#111936',
+                            700: '#1e2954'
+                        },
+                        duo: {
+                            purple: '#9d72ff',
+                            cyan: '#38bdf8',
+                            gold: '#fbbf24',
+                            silver: '#e2e8f0',
+                            nebula: '#6366f1'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['SF Pro Display', '-apple-system', 'BlinkMacSystemFont', 'Inter', 'sans-serif'],
+                        mono: ['SF Mono', 'ui-monospace', 'Menlo', 'monospace']
+                    },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 3s ease-in-out infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'aurora': 'aurora 14s ease infinite alternate'
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
+                            '50%': { opacity: '0.8', transform: 'scale(1.05)' }
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' }
+                        },
+                        aurora: {
+                            '0%': { backgroundPosition: '0% 50%' },
+                            '100%': { backgroundPosition: '100% 50%' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Leaflet & Confetti Libraries -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #030611;
+            color: #f8fafc;
+            overflow-x: hidden;
+            min-height: 100vh;
+            min-height: 100dvh;
+            touch-action: pan-y;
+        }
+
+        /* Cosmic Canvas Background */
+        #starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Ambient Aurora Backdrops */
+        .aurora-bg {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            background: 
+                radial-gradient(circle at 50% 15%, rgba(99, 102, 241, 0.18) 0%, transparent 55%),
+                radial-gradient(circle at 10% 40%, rgba(56, 189, 248, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 85% 60%, rgba(157, 114, 255, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 50% 90%, rgba(14, 165, 233, 0.08) 0%, transparent 45%);
+            filter: blur(40px);
+        }
+
+        /* Case Box & Roulette Track */
+        .roulette-viewport {
+            width: 100%;
+            height: 250px;
+            position: relative;
+            background: rgba(7, 11, 22, 0.65);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.8), 0 20px 40px -10px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+        }
+
+        @media (min-width: 640px) {
+            .roulette-viewport {
+                height: 290px;
+            }
+        }
+
+        .roulette-track {
+            display: flex;
+            height: 100%;
+            align-items: center;
+            will-change: transform;
+            transition-property: transform;
+            transition-timing-function: cubic-bezier(0.1, 0.88, 0.15, 1);
+        }
+
+        /* Item Cards - Mobile Responsive Widths & Heights */
+        .case-card {
+            flex: 0 0 150px;
+            height: 215px;
+            margin: 0 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 10px;
+            border-radius: 1.25rem;
+            background: linear-gradient(165deg, rgba(20, 27, 49, 0.75) 0%, rgba(9, 13, 27, 0.9) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease;
+        }
+
+        @media (min-width: 640px) {
+            .case-card {
+                flex: 0 0 170px;
+                height: 245px;
+                margin: 0 12px;
+                padding: 16px 12px;
+            }
+        }
+
+        /* Inner Ambient Gradients by Rarity */
+        .rarity-common { border-color: rgba(148, 163, 184, 0.2); }
+        .rarity-uncommon { border-color: rgba(56, 189, 248, 0.3); }
+        .rarity-rare { border-color: rgba(168, 85, 247, 0.35); }
+        .rarity-epic { border-color: rgba(236, 72, 153, 0.4); }
+        .rarity-legendary {
+            border-color: rgba(250, 204, 21, 0.5);
+            background: linear-gradient(165deg, rgba(32, 28, 60, 0.85) 0%, rgba(13, 10, 31, 0.95) 100%);
+        }
+
+        /* Glowing Badges & Bottom Bars */
+        .case-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 15%;
+            right: 15%;
+            height: 3px;
+            border-radius: 3px 3px 0 0;
+            filter: blur(1px);
+        }
+
+        .rarity-common::after { background: #64748b; box-shadow: 0 0 12px #64748b; }
+        .rarity-uncommon::after { background: #38bdf8; box-shadow: 0 0 14px #38bdf8; }
+        .rarity-rare::after { background: #a855f7; box-shadow: 0 0 16px #a855f7; }
+        .rarity-epic::after { background: #ec4899; box-shadow: 0 0 18px #ec4899; }
+        .rarity-legendary::after { background: linear-gradient(90deg, #f59e0b, #fbbf24, #a855f7); box-shadow: 0 0 24px #fbbf24; }
+
+        /* Legendary Shimmer */
+        .rarity-legendary::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 20%, rgba(250, 204, 21, 0.15) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .case-card.winner-glow {
+            transform: scale(1.08);
+            z-index: 30;
+            box-shadow: 0 0 50px rgba(251, 191, 36, 0.7), 0 0 90px rgba(168, 85, 247, 0.4);
+            border-color: rgba(253, 224, 71, 0.9);
+        }
+
+        /* Center Laser Marker */
+        .center-indicator {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(180deg, #fef08a 0%, #38bdf8 50%, #9333ea 100%);
+            z-index: 40;
+            box-shadow: 0 0 12px #ffffff, 0 0 25px #fbbf24, 0 0 45px #38bdf8;
+            pointer-events: none;
+        }
+
+        .center-indicator::before, .center-indicator::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 14px;
+            height: 14px;
+            background: #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 20px #fbbf24, 0 0 35px #38bdf8;
+        }
+        .center-indicator::before { top: 2px; }
+        .center-indicator::after { bottom: 2px; }
+
+        /* Vignette Fades on Roulette */
+        .vignette-left {
+            background: linear-gradient(to right, #030611 0%, rgba(3, 6, 17, 0.9) 35%, rgba(3, 6, 17, 0) 100%);
+        }
+        .vignette-right {
+            background: linear-gradient(to left, #030611 0%, rgba(3, 6, 17, 0.9) 35%, rgba(3, 6, 17, 0) 100%);
+        }
+
+        /* Keynote Button */
+        .btn-cosmic {
+            background: linear-gradient(135deg, #2563eb 0%, #4f46e5 50%, #7c3aed 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px -5px rgba(79, 70, 229, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-cosmic::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+            transition: all 0.6s ease;
+        }
+        .btn-cosmic:hover:not(:disabled)::before {
+            left: 100%;
+        }
+        .btn-cosmic:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 40px -5px rgba(124, 58, 237, 0.75), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+        .btn-cosmic:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+        .btn-cosmic:disabled {
+            background: #1e293b;
+            color: #64748b;
+            border-color: #334155;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Leaflet Dark Customization */
+        .leaflet-container {
+            font-family: inherit;
+            background: #090e1f !important;
+        }
+        .leaflet-control-zoom-in, .leaflet-control-zoom-out {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+
+        /* Custom Scrollbar for Modal on small screens */
+        .modal-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .modal-scroll::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.25);
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+
+<body class="relative flex flex-col justify-between items-center text-slate-100 min-h-screen min-h-[100dvh] safe-area-inset">
+    <canvas id="starfield"></canvas>
+    <div class="aurora-bg"></div>
+
+    <!-- Navigation / Brand Header -->
+    <header class="relative z-10 w-full max-w-6xl px-4 sm:px-6 pt-4 sm:pt-6 pb-2 sm:pb-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg?utm_source=ru.wikipedia.org&utm_campaign=index&utm_content=original" 
+                 alt="Apple" 
+                 class="w-7 h-7 sm:w-8 sm:h-8 object-contain filter invert drop-shadow-[0_0_12px_rgba(255,255,255,0.45)]" 
+                 onerror="this.style.display='none';">
+            <div>
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    <span class="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.2em] sm:tracking-[0.25em] text-duo-purple">Special Edition</span>
+                    <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">MAX DROP</span>
+                </div>
+                <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2 leading-tight">
+                    iPhone Duo Keynote Drop
+                </h1>
+            </div>
+        </div>
+    </header>
+
+    <main class="relative z-10 w-full flex-1 flex flex-col justify-center items-center py-2 sm:py-6">
+        <div class="relative w-full max-w-7xl px-0 sm:px-4 mb-4 sm:mb-8">
+            <div class="roulette-viewport relative">
+                <!-- Center Precision Pointer Indicator -->
+                <div class="center-indicator"></div>
+
+                <!-- Scrolling Track for Item Cards -->
+                <div class="roulette-track" id="case-track">
+                    <!-- Items generated by JS -->
+                </div>
+
+                <!-- Edge Fade Masks -->
+                <div class="absolute inset-y-0 left-0 w-12 sm:w-48 vignette-left pointer-events-none z-20"></div>
+                <div class="absolute inset-y-0 right-0 w-12 sm:w-48 vignette-right pointer-events-none z-20"></div>
+            </div>
+        </div>
+
+        <!-- Action Controls -->
+        <div class="flex justify-center w-full px-4 mt-1 sm:mt-2 pb-4">
+            <button id="spin-btn" class="btn-cosmic text-white font-black py-4 sm:py-5 px-8 sm:px-16 rounded-2xl text-lg sm:text-2xl w-full max-w-md tracking-widest uppercase shadow-xl transition-all active:scale-[0.98]">
+                UNLOCK DEVICE
+            </button>
+        </div>
+    </main>
+
+    <!-- Main Result & Dispatch Modal -->
+    <div id="result-modal" class="fixed inset-0 bg-black/85 backdrop-blur-xl hidden items-center justify-center z-50 opacity-0 transition-opacity duration-500 p-3 sm:p-4 overflow-y-auto">
+        <div class="bg-night-900 border border-slate-700/80 rounded-[1.75rem] sm:rounded-[2rem] p-5 sm:p-8 max-w-lg w-full max-h-[92dvh] overflow-y-auto modal-scroll transform scale-95 transition-all duration-500 shadow-[0_0_80px_rgba(0,0,0,0.9)] relative my-auto" id="modal-box">
+            
+            <!-- Ambient Glow Spots -->
+            <div class="absolute -top-24 -right-24 w-56 h-56 bg-amber-500/20 rounded-full blur-[90px] pointer-events-none"></div>
+            <div class="absolute -bottom-24 -left-24 w-56 h-56 bg-purple-600/20 rounded-full blur-[90px] pointer-events-none"></div>
+
+            <!-- View 1: Winner Announcement -->
+            <div id="step-winner" class="text-center relative z-10">
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-black tracking-widest uppercase bg-amber-400/20 text-amber-300 border border-amber-400/30 mb-2 sm:mb-3 shadow-[0_0_15px_rgba(251,191,36,0.3)]">
+                    ★ MAX TIER ACQUIRED ★
+                </div>
+                <h2 class="text-xl sm:text-3xl font-black text-white uppercase tracking-wider">Device Secured</h2>
+                <div class="w-14 sm:w-16 h-1 bg-gradient-to-r from-amber-400 via-indigo-500 to-purple-500 mx-auto rounded-full mt-1.5 sm:mt-2 mb-3 sm:mb-4"></div>
+                
+                <!-- Winner Showcase Spotlight -->
+                <div class="relative flex justify-center items-center my-2 sm:my-4 h-52 sm:h-72">
+                    <div class="absolute inset-0 bg-gradient-to-b from-amber-400/10 via-transparent to-purple-500/10 rounded-2xl filter blur-xl"></div>
+                    <div id="winner-display-container" class="relative z-10 w-full h-full flex flex-col items-center justify-center p-2">
+                        <!-- Injected by script -->
+                    </div>
+                </div>
+                
+                <h3 id="winner-title" class="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-200 to-yellow-400 mb-1 drop-shadow"></h3>
+                <p id="winner-sub" class="text-[11px] sm:text-xs text-slate-400 mb-4 sm:mb-6 font-mono">256GB NIGHT SKY • UNLOCKED IMEI</p>
+
+                <button id="claim-drop-btn" class="w-full py-3.5 sm:py-4 px-6 rounded-xl font-black text-slate-950 uppercase tracking-widest bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 hover:from-amber-200 hover:to-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.5)] transition-all transform active:scale-[0.98] sm:hover:scale-[1.02] text-sm sm:text-base">
+                    Claim Drop & Pin Address
+                </button>
+            </div>
+
+            <!-- View 2: Pin Delivery Location on Leaflet Map -->
+            <div id="step-location" class="text-center relative z-10 hidden">
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold tracking-widest uppercase bg-sky-500/20 text-sky-300 border border-sky-400/30 mb-2">
+                    Step 2 of 2
+                </div>
+                <h2 class="text-xl sm:text-2xl font-black text-white">Select Drop Zone</h2>
+                <p class="text-slate-400 text-xs mb-3">Tap on the satellite map to lock in your GPS delivery coordinates.</p>
+                
+                <div id="delivery-map" class="w-full h-52 sm:h-72 bg-slate-950 rounded-2xl mb-3 overflow-hidden border border-slate-700/80 shadow-inner"></div>
+                
+                <div id="coords-display" class="text-[10px] sm:text-[11px] font-mono text-slate-400 mb-3 bg-slate-950/60 py-1.5 px-3 rounded-lg border border-slate-800 break-words">
+                    Tap the map to arm dispatch beacon
+                </div>
+
+                <button id="confirm-dispatch-btn" disabled class="w-full py-3.5 px-6 rounded-xl font-bold uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:border-slate-700 transition shadow-[0_10px_25px_-5px_rgba(99,102,241,0.5)] disabled:shadow-none text-xs sm:text-sm">
+                    Confirm Transit Protocol
+                </button>
+            </div>
+
+            <!-- View 3: Final Dispatch Confirmation & Countdown -->
+            <div id="step-success" class="text-center relative z-10 hidden flex flex-col items-center py-2 sm:py-4">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-full flex items-center justify-center mb-3 sm:mb-4 shadow-[0_0_40px_rgba(16,185,129,0.5)]">
+                    <svg class="w-8 h-8 sm:w-10 sm:h-10 text-slate-950 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h2 class="text-xl sm:text-3xl font-black text-white mb-1">Dispatch Activated</h2>
+                <p class="text-slate-400 text-xs sm:text-sm mb-4 sm:mb-6 max-w-sm px-2">
+                    Your <strong class="text-amber-300">iPhone Duo 256GB Night Sky</strong> has been allocated and transferred to secure express transport.
+                </p>
+                
+                <div class="bg-slate-950/80 p-4 sm:p-5 rounded-2xl border border-slate-800 w-full mb-4 sm:mb-6 backdrop-blur-md">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1 sm:mb-2">Estimated Courier Arrival</p>
+                    <div id="countdown-timer" class="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-indigo-300 to-amber-300 tracking-wider font-mono">
+                        23:59:59
+                    </div>
+                    <div class="mt-2 text-[10px] sm:text-[11px] text-emerald-400 font-mono flex items-center justify-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Tracking: APL-DUO-7729-SKY
+                    </div>
+                </div>
+
+                <button id="reset-sim-btn" class="w-full py-3 px-6 rounded-xl font-bold uppercase tracking-wider text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white transition text-xs">
+                    Spin Another Drop
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /* Product catalog with iPhone Duo Night Sky as the max reward and Cosmic Orange as a side reward */
+        const INVENTORY = [
+            {
+                id: 'duo_night_sky',
+                name: 'iPhone Duo 256GB Night Sky',
+                image: 'https://cdn.ya.ua/uploads/variations/iphone-duo-256gb-night-sky1.webp',
+                rarity: 'legendary',
+                badgeText: 'MAX REWARD',
+                accentColor: 'text-amber-300',
+                chance: 1, // 1% Apex reward
+                spec: 'Dual Horizon OLED • Night Sky'
+            },
+            {
+                id: 'iphone_17_pro_max_orange',
+                name: 'iPhone 17 Pro Max Cosmic Orange',
+                image: 'https://ya-ua.fra1.digitaloceanspaces.com/uploads/previews/iphone-17-pro-max-512-gb-cosmic-orange-mfyt41.webp',
+                rarity: 'epic',
+                badgeText: 'EPIC SIDE REWARD',
+                accentColor: 'text-orange-400',
+                chance: 5,
+                spec: 'Cosmic Orange Titanium'
+            },
+            {
+                id: 'iphone_17_air',
+                name: 'iPhone Air Space Black',
+                image: 'https://ya-ua.fra1.digitaloceanspaces.com/uploads/previews/iphone-17-air-256gb-space-black-now1.webp',
+                rarity: 'epic',
+                badgeText: 'EPIC',
+                accentColor: 'text-pink-400',
+                chance: 5,
+                spec: 'Ultra-slim Titanium'
+            },
+            {
+                id: 'iphone_17_pro_max_silver',
+                name: 'iPhone 17 Pro Max Silver',
+                image: 'https://ya-ua.fra1.digitaloceanspaces.com/uploads/previews/iphone-17-pro-max-256-gb-silver4.webp',
+                rarity: 'rare',
+                badgeText: 'RARE',
+                accentColor: 'text-purple-400',
+                chance: 9,
+                spec: 'Triple Camera Array'
+            },
+            {
+                id: 'iphone_16_pro_max_desert',
+                name: 'iPhone 16 Pro Max Desert',
+                image: 'https://ya-ua.fra1.digitaloceanspaces.com/uploads/previews/iphone-16-pro-max-512gb-desert-titanium-ua1.png',
+                rarity: 'uncommon',
+                badgeText: 'UNCOMMON',
+                accentColor: 'text-sky-400',
+                chance: 15,
+                spec: 'Desert Titanium Body'
+            },
+            {
+                id: 'iphone_16_plus_white',
+                name: 'iPhone 16 Plus White',
+                image: 'https://ya-ua.fra1.digitaloceanspaces.com/uploads/previews/iphone-16-plus-256gb-white-e-sim1.webp',
+                rarity: 'common',
+                badgeText: 'COMMON',
+                accentColor: 'text-slate-300',
+                chance: 30,
+                spec: 'Ceramic Shield White'
+            },
+            {
+                id: 'iphone_16_teal',
+                name: 'iPhone 16 Teal',
+                image: 'https://ya-ua.fra1.digitaloceanspaces.com/uploads/previews/iphone-16-128gb-teal-myed3-ua1.png',
+                rarity: 'common',
+                badgeText: 'COMMON',
+                accentColor: 'text-slate-300',
+                chance: 35,
+                spec: 'Dynamic Island Teal'
+            }
+        ];
+
+        /* Roulette Geometry & Parameters */
+        const TOTAL_SLOTS = 100;
+
+        /* DOM Elements */
+        const caseTrack = document.getElementById('case-track');
+        const spinBtn = document.getElementById('spin-btn');
+        
+        const resultModal = document.getElementById('result-modal');
+        const modalBox = document.getElementById('modal-box');
+        const stepWinner = document.getElementById('step-winner');
+        const stepLocation = document.getElementById('step-location');
+        const stepSuccess = document.getElementById('step-success');
+        
+        const winnerContainer = document.getElementById('winner-display-container');
+        const winnerTitle = document.getElementById('winner-title');
+        const winnerSub = document.getElementById('winner-sub');
+        const claimDropBtn = document.getElementById('claim-drop-btn');
+        const confirmDispatchBtn = document.getElementById('confirm-dispatch-btn');
+        const coordsDisplay = document.getElementById('coords-display');
+        const resetSimBtn = document.getElementById('reset-sim-btn');
+        const countdownTimer = document.getElementById('countdown-timer');
+
+        /* State Variables */
+        let isSpinning = false;
+        let leafletMap = null;
+        let selectedLocationMarker = null;
+        let countdownTimerId = null;
+
+        const canvas = document.getElementById('starfield');
+        const ctx = canvas.getContext('2d');
+        let stars = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            stars = [];
+            const numStars = Math.floor((canvas.width * canvas.height) / 7000);
+            for (let i = 0; i < numStars; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 1.5 + 0.3,
+                    alpha: Math.random() * 0.7 + 0.2,
+                    speed: Math.random() * 0.02 + 0.005,
+                    pulse: Math.random() * Math.PI
+                });
+            }
+        }
+
+        function drawStars() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let star of stars) {
+                star.pulse += star.speed;
+                const dynamicAlpha = star.alpha + Math.sin(star.pulse) * 0.25;
+                ctx.fillStyle = `rgba(224, 231, 255, ${Math.max(0.1, Math.min(1, dynamicAlpha))})`;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            requestAnimationFrame(drawStars);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        requestAnimationFrame(drawStars);
+
+        function getRandomItem() {
+            const rand = Math.random() * 100;
+            let cumulativeChance = 0;
+            for (const item of INVENTORY) {
+                cumulativeChance += item.chance;
+                if (rand <= cumulativeChance) {
+                    return item;
+                }
+            }
+            return INVENTORY[0];
+        }
+
+        function buildItemElement(item) {
+            const el = document.createElement('div');
+            el.className = `case-card rarity-${item.rarity}`;
+            
+            const isLegendary = item.rarity === 'legendary';
+            
+            el.innerHTML = `
+                <div class="w-full flex justify-between items-center text-[9px] sm:text-[10px] font-black uppercase tracking-wider relative z-10">
+                    <span class="${isLegendary ? 'text-amber-400' : 'text-slate-400'}">${item.badgeText}</span>
+                    ${isLegendary ? '<span class="text-amber-400 animate-pulse text-xs">✦</span>' : ''}
+                </div>
+                
+                <div class="w-full h-24 sm:h-32 flex justify-center items-center relative z-10 my-1 group">
+                    ${isLegendary ? '<div class="absolute inset-0 bg-amber-500/10 rounded-full filter blur-md"></div>' : ''}
+                    <img src="${item.image}" alt="${item.name}" loading="lazy" class="max-h-full max-w-full object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.6)] transition-transform duration-300 sm:group-hover:scale-110" onerror="this.src='https://placehold.co/120x150/111827/eab308?text=iPhone'">
+                </div>
+
+                <div class="w-full text-center relative z-10">
+                    <div class="font-bold text-[11px] sm:text-xs truncate px-0.5 sm:px-1 ${item.accentColor}" title="${item.name}">${item.name}</div>
+                    <div class="text-[8px] sm:text-[9px] text-slate-400 tracking-wide truncate mt-0.5">${item.spec}</div>
+                </div>
+            `;
+            return el;
+        }
+
+        function populateTrack() {
+            caseTrack.innerHTML = '';
+            caseTrack.style.transition = 'none';
+            caseTrack.style.transform = 'translateX(0px)';
+
+            for (let i = 0; i < TOTAL_SLOTS; i++) {
+                const item = getRandomItem();
+                const node = buildItemElement(item);
+                caseTrack.appendChild(node);
+            }
+        }
+
+        // Dynamically compute the stride between cards to support any viewport size (mobile vs desktop)
+        function calculateStride() {
+            if (caseTrack.children.length > 1) {
+                const card1 = caseTrack.children[0].getBoundingClientRect();
+                const card2 = caseTrack.children[1].getBoundingClientRect();
+                return Math.abs(card2.left - card1.left);
+            }
+            return window.innerWidth < 640 ? 170 : 194;
+        }
+
+        function triggerSpin() {
+            if (isSpinning) return;
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            spinBtn.innerHTML = `
+                <span class="flex items-center justify-center gap-2 sm:gap-3">
+                    <svg class="animate-spin h-5 w-5 sm:h-6 sm:w-6 text-sky-300" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>DECRYPTING...</span>
+                </span>
+            `;
+
+            populateTrack();
+
+            // The target winner slot index (between 75 and 85)
+            const winningIndex = Math.floor(Math.random() * 10) + 75;
+            
+            // As required, the maximum reward is the legendary iPhone Duo 256GB Night Sky
+            const guaranteedWinner = INVENTORY.find(item => item.id === 'duo_night_sky');
+            
+            // Replace slot with iPhone Duo
+            const targetNode = caseTrack.children[winningIndex];
+            const winnerNode = buildItemElement(guaranteedWinner);
+            caseTrack.replaceChild(winnerNode, targetNode);
+
+            // Dynamically calculate stride and viewport width for 100% precision on any phone screen
+            requestAnimationFrame(() => {
+                const itemStride = calculateStride();
+                const cardWidth = winnerNode.offsetWidth || (window.innerWidth < 640 ? 150 : 170);
+                const viewportWidth = document.querySelector('.roulette-viewport').offsetWidth;
+                const centerPoint = viewportWidth / 2;
+
+                // Subtle authentic jitter that still ensures the center indicator lands on the card
+                const slightOffset = (Math.random() - 0.5) * (cardWidth * 0.4);
+                const targetScrollPosition = (winningIndex * itemStride) - centerPoint + (itemStride / 2) + slightOffset;
+
+                // Physics timing: 7.6 seconds smooth natural glide
+                const spinDurationMs = 7600;
+                caseTrack.style.transition = `transform ${spinDurationMs}ms cubic-bezier(0.12, 0.88, 0.16, 1)`;
+                caseTrack.style.transform = `translateX(-${targetScrollPosition}px)`;
+
+                // Reveal winner modal on completion
+                setTimeout(() => {
+                    revealResult(guaranteedWinner, winnerNode);
+                }, spinDurationMs + 250);
+            });
+        }
+
+        function revealResult(winner, node) {
+            node.classList.add('winner-glow');
+
+            setTimeout(() => {
+                // Populate Winner Showcase in Modal
+                winnerContainer.innerHTML = `
+                    <div class="relative flex flex-col items-center">
+                        <img src="${winner.image}" alt="${winner.name}" class="h-40 sm:h-52 object-contain filter drop-shadow-[0_15px_30px_rgba(251,191,36,0.6)] animate-float" onerror="this.src='https://placehold.co/180x220/111827/eab308?text=iPhone+Duo'">
+                    </div>
+                `;
+
+                winnerTitle.textContent = winner.name;
+                winnerSub.textContent = `${winner.spec} • SERIAL CERTIFIED`;
+
+                // Display Modal with Fade-In
+                resultModal.classList.remove('hidden');
+                resultModal.classList.add('flex');
+                void resultModal.offsetWidth;
+
+                resultModal.classList.remove('opacity-0');
+                modalBox.classList.remove('scale-95');
+                modalBox.classList.add('scale-100');
+
+                stepWinner.classList.remove('hidden');
+                stepLocation.classList.add('hidden');
+                stepSuccess.classList.add('hidden');
+
+                // Confetti fireworks
+                launchConfettiCelebration();
+
+                isSpinning = false;
+                spinBtn.disabled = false;
+                spinBtn.textContent = 'UNLOCK DEVICE';
+            }, 900);
+        }
+
+        function launchConfettiCelebration() {
+            const end = Date.now() + 2500;
+            const colors = ['#fbbf24', '#f59e0b', '#38bdf8', '#c084fc', '#ffffff'];
+
+            (function frame() {
+                confetti({
+                    particleCount: window.innerWidth < 640 ? 3 : 5,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0, y: 0.65 },
+                    colors: colors
+                });
+                confetti({
+                    particleCount: window.innerWidth < 640 ? 3 : 5,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1, y: 0.65 },
+                    colors: colors
+                });
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            })();
+        }
+
+        function setupLeafletMap() {
+            setTimeout(() => {
+                if (!leafletMap) {
+                    // Default center: Cupertino / Silicon Valley, CA (Apple Park area)
+                    leafletMap = L.map('delivery-map', {
+                        zoomControl: true,
+                        tap: false // Recommended for modern mobile browsers
+                    }).setView([37.3346, -122.0090], 12);
+
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap &copy; CARTO',
+                        subdomains: 'abcd',
+                        maxZoom: 19
+                    }).addTo(leafletMap);
+
+                    leafletMap.on('click', (e) => {
+                        const { lat, lng } = e.latlng;
+                        if (selectedLocationMarker) {
+                            selectedLocationMarker.setLatLng(e.latlng);
+                        } else {
+                            selectedLocationMarker = L.marker(e.latlng).addTo(leafletMap);
+                        }
+                        const latHemisphere = lat >= 0 ? '°N' : '°S';
+                        const lngHemisphere = lng >= 0 ? '°E' : '°W';
+                        coordsDisplay.innerHTML = `<span class="text-emerald-400 font-bold">✓ Locked:</span> ${Math.abs(lat).toFixed(4)}${latHemisphere}, ${Math.abs(lng).toFixed(4)}${lngHemisphere}`;
+                        confirmDispatchBtn.disabled = false;
+                        confirmDispatchBtn.classList.remove('bg-indigo-600');
+                        confirmDispatchBtn.classList.add('bg-gradient-to-r', 'from-emerald-500', 'to-teal-500');
+                    });
+                } else {
+                    leafletMap.invalidateSize();
+                }
+            }, 200);
+        }
+
+        function startCountdown() {
+            let secondsLeft = 23 * 3600 + 59 * 60 + 59;
+            if (countdownTimerId) clearInterval(countdownTimerId);
+
+            function updateTime() {
+                const h = String(Math.floor(secondsLeft / 3600)).padStart(2, '0');
+                const m = String(Math.floor((secondsLeft % 3600) / 60)).padStart(2, '0');
+                const s = String(secondsLeft % 60).padStart(2, '0');
+                countdownTimer.textContent = `${h}:${m}:${s}`;
+                if (secondsLeft > 0) {
+                    secondsLeft--;
+                } else {
+                    clearInterval(countdownTimerId);
+                }
+            }
+
+            updateTime();
+            countdownTimerId = setInterval(updateTime, 1000);
+        }
+
+        claimDropBtn.addEventListener('click', () => {
+            stepWinner.classList.add('hidden');
+            stepLocation.classList.remove('hidden');
+            setupLeafletMap();
+        });
+
+        confirmDispatchBtn.addEventListener('click', () => {
+            stepLocation.classList.add('hidden');
+            stepSuccess.classList.remove('hidden');
+            startCountdown();
+            launchConfettiCelebration();
+        });
+
+        resetSimBtn.addEventListener('click', () => {
+            resultModal.classList.add('opacity-0');
+            modalBox.classList.remove('scale-100');
+            modalBox.classList.add('scale-95');
+            setTimeout(() => {
+                resultModal.classList.add('hidden');
+                resultModal.classList.remove('flex');
+                populateTrack();
+            }, 400);
+        });
+
+        spinBtn.addEventListener('click', triggerSpin);
+
+        // Initial track build on boot
+        populateTrack();
+    </script>
+</body>
+</html>
